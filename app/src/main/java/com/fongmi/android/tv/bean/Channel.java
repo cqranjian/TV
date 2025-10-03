@@ -4,6 +4,8 @@ import android.text.TextUtils;
 import android.view.View;
 import android.widget.ImageView;
 
+import androidx.annotation.Nullable;
+
 import com.fongmi.android.tv.App;
 import com.fongmi.android.tv.R;
 import com.fongmi.android.tv.utils.ImgUtil;
@@ -18,13 +20,12 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 
 public class Channel {
 
     @SerializedName("urls")
     private List<String> urls;
-    @SerializedName("tvgName")
-    private String tvgName;
     @SerializedName("number")
     private String number;
     @SerializedName("logo")
@@ -43,6 +44,10 @@ public class Channel {
     private String origin;
     @SerializedName("referer")
     private String referer;
+    @SerializedName("tvgId")
+    private String tvgId;
+    @SerializedName("tvgName")
+    private String tvgName;
     @SerializedName("catchup")
     private Catchup catchup;
     @SerializedName("header")
@@ -86,14 +91,6 @@ public class Channel {
 
     public Channel(String name) {
         this.name = name;
-    }
-
-    public String getTvgName() {
-        return TextUtils.isEmpty(tvgName) ? getName() : tvgName;
-    }
-
-    public void setTvgName(String tvgName) {
-        this.tvgName = tvgName;
     }
 
     public List<String> getUrls() {
@@ -174,6 +171,22 @@ public class Channel {
 
     public void setReferer(String referer) {
         this.referer = referer;
+    }
+
+    public String getTvgId() {
+        return TextUtils.isEmpty(tvgId) ? getTvgName() : tvgId;
+    }
+
+    public void setTvgId(String tvgId) {
+        this.tvgId = tvgId;
+    }
+
+    public String getTvgName() {
+        return TextUtils.isEmpty(tvgName) ? getName() : tvgName;
+    }
+
+    public void setTvgName(String tvgName) {
+        this.tvgName = tvgName;
     }
 
     public Catchup getCatchup() {
@@ -269,7 +282,7 @@ public class Channel {
     }
 
     public void loadLogo(ImageView view) {
-        ImgUtil.loadLive(getLogo(), view);
+        ImgUtil.load(getName(), getLogo(), view, false);
     }
 
     public void addUrls(String... urls) {
@@ -285,7 +298,7 @@ public class Channel {
     }
 
     public String getCurrent() {
-        return getUrls().isEmpty() ? "" : getUrls().get(getLine());
+        return getUrls().isEmpty() ? "" : getUrls().get(getLine()).split("\\$")[0];
     }
 
     public boolean isOnly() {
@@ -304,7 +317,8 @@ public class Channel {
 
     public String getLineText() {
         if (getUrls().size() <= 1) return "";
-        if (getCurrent().contains("$")) return getCurrent().split("\\$")[1];
+        String[] sp = getUrls().get(getLine()).split("\\$");
+        if (sp.length > 1 && !sp[1].isEmpty()) return sp[1];
         return ResUtil.getString(R.string.live_line, getLine() + 1);
     }
 
@@ -325,8 +339,8 @@ public class Channel {
         if (!live.getOrigin().isEmpty() && getOrigin().isEmpty()) setOrigin(live.getOrigin());
         if (!live.getCatchup().isEmpty() && getCatchup().isEmpty()) setCatchup(live.getCatchup());
         if (!live.getReferer().isEmpty() && getReferer().isEmpty()) setReferer(live.getReferer());
-        if (live.getEpg().contains("{") && !getEpg().startsWith("http")) setEpg(live.getEpg().replace("{name}", getTvgName()).replace("{epg}", getEpg()));
-        if (live.getLogo().contains("{") && !getLogo().startsWith("http")) setLogo(live.getLogo().replace("{name}", getTvgName()).replace("{logo}", getLogo()));
+        if (live.getEpg().contains("{") && !getEpg().startsWith("http")) setEpg(live.getEpgApi().replace("{id}", getTvgId()).replace("{name}", getTvgName()).replace("{epg}", getEpg()));
+        if (live.getLogo().contains("{") && !getLogo().startsWith("http")) setLogo(live.getLogo().replace("{id}", getTvgId()).replace("{name}", getTvgName()).replace("{logo}", getLogo()));
     }
 
     public void setLine(String line) {
@@ -351,6 +365,7 @@ public class Channel {
         setFormat(item.getFormat());
         setParse(item.getParse());
         setClick(item.getClick());
+        setTvgId(item.getTvgId());
         setLogo(item.getLogo());
         setName(item.getName());
         setUrls(item.getUrls());
@@ -370,10 +385,16 @@ public class Channel {
     }
 
     @Override
-    public boolean equals(Object obj) {
+    public boolean equals(@Nullable Object obj) {
         if (this == obj) return true;
-        if (!(obj instanceof Channel)) return false;
-        Channel it = (Channel) obj;
-        return getName().equals(it.getName()) || (!getNumber().isEmpty() && getNumber().equals(it.getNumber()));
+        if (!(obj instanceof Channel it)) return false;
+        if (!getName().isEmpty()) return getName().equals(it.getName());
+        if (!getNumber().isEmpty()) return getNumber().equals(it.getNumber());
+        return getName().equals(it.getName()) && getNumber().equals(it.getNumber());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(getName(), getNumber());
     }
 }

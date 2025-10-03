@@ -1,6 +1,5 @@
 package com.fongmi.android.tv.model;
 
-import android.net.Uri;
 import android.text.TextUtils;
 
 import androidx.collection.ArrayMap;
@@ -24,6 +23,7 @@ import com.fongmi.android.tv.utils.Sniffer;
 import com.github.catvod.crawler.Spider;
 import com.github.catvod.crawler.SpiderDebug;
 import com.github.catvod.net.OkHttp;
+import com.github.catvod.utils.Prefers;
 import com.github.catvod.utils.Trans;
 import com.github.catvod.utils.Util;
 
@@ -49,11 +49,20 @@ public class SiteViewModel extends ViewModel {
     private ExecutorService executor;
 
     public SiteViewModel() {
-        this.episode = new MutableLiveData<>();
-        this.result = new MutableLiveData<>();
-        this.player = new MutableLiveData<>();
-        this.search = new MutableLiveData<>();
-        this.action = new MutableLiveData<>();
+        episode = new MutableLiveData<>();
+        result = new MutableLiveData<>();
+        player = new MutableLiveData<>();
+        search = new MutableLiveData<>();
+        action = new MutableLiveData<>();
+    }
+
+    public SiteViewModel init() {
+        search.setValue(null);
+        result.setValue(null);
+        player.setValue(null);
+        action.setValue(null);
+        episode.setValue(null);
+        return this;
     }
 
     public void setEpisode(Episode value) {
@@ -65,7 +74,9 @@ public class SiteViewModel extends ViewModel {
             Site site = VodConfig.get().getHome();
             if (site.getType() == 3) {
                 Spider spider = site.recent().spider();
-                String homeContent = spider.homeContent(true);
+                boolean crash = Prefers.getBoolean("crash");
+                String homeContent = crash ? "" : spider.homeContent(true);
+                Prefers.put("crash", false);
                 SpiderDebug.log(homeContent);
                 Result result = Result.fromJson(homeContent);
                 if (!result.getList().isEmpty()) return result;
@@ -76,12 +87,14 @@ public class SiteViewModel extends ViewModel {
             } else if (site.getType() == 4) {
                 ArrayMap<String, String> params = new ArrayMap<>();
                 params.put("filter", "true");
-                String homeContent = call(site, params, false);
+                String homeContent = call(site.fetchExt(), params);
                 SpiderDebug.log(homeContent);
                 return Result.fromJson(homeContent);
             } else {
-                String homeContent = OkHttp.newCall(site.getApi(), site.getHeaders()).execute().body().string();
+                Response response = OkHttp.newCall(site.getApi(), site.getHeaders()).execute();
+                String homeContent = response.body().string();
                 SpiderDebug.log(homeContent);
+                response.close();
                 return fetchPic(site, Result.fromType(site.getType(), homeContent));
             }
         });
@@ -102,7 +115,7 @@ public class SiteViewModel extends ViewModel {
                 params.put("ac", site.getType() == 0 ? "videolist" : "detail");
                 params.put("t", tid);
                 params.put("pg", page);
-                String categoryContent = call(site, params, true);
+                String categoryContent = call(site, params);
                 SpiderDebug.log(categoryContent);
                 return Result.fromType(site.getType(), categoryContent);
             }
@@ -132,7 +145,7 @@ public class SiteViewModel extends ViewModel {
                 ArrayMap<String, String> params = new ArrayMap<>();
                 params.put("ac", site.getType() == 0 ? "videolist" : "detail");
                 params.put("ids", id);
-                String detailContent = call(site, params, true);
+                String detailContent = call(site, params);
                 SpiderDebug.log(detailContent);
                 Result result = Result.fromType(site.getType(), detailContent);
                 if (!result.getList().isEmpty()) result.getList().get(0).setVodFlags();
@@ -160,7 +173,7 @@ public class SiteViewModel extends ViewModel {
                 ArrayMap<String, String> params = new ArrayMap<>();
                 params.put("play", id);
                 params.put("flag", flag);
-                String playerContent = call(site, params, true);
+                String playerContent = call(site, params);
                 SpiderDebug.log(playerContent);
                 Result result = Result.fromJson(playerContent);
                 if (result.getFlag().isEmpty()) result.setFlag(flag);
@@ -176,8 +189,6 @@ public class SiteViewModel extends ViewModel {
                 return result;
             } else {
                 Url url = Url.create().add(id);
-                String type = Uri.parse(id).getQueryParameter("type");
-                if ("json".equals(type)) url = Result.fromJson(OkHttp.newCall(id, site.getHeaders()).execute().body().string()).getUrl();
                 Result result = new Result();
                 result.setUrl(url);
                 result.setFlag(flag);
@@ -211,7 +222,8 @@ public class SiteViewModel extends ViewModel {
             ArrayMap<String, String> params = new ArrayMap<>();
             params.put("wd", Trans.t2s(keyword));
             params.put("quick", String.valueOf(quick));
-            String searchContent = call(site, params, true);
+            params.put("extend", "");
+            String searchContent = call(site, params);
             SpiderDebug.log(site.getName() + "," + searchContent);
             post(site, fetchPic(site, Result.fromType(site.getType(), searchContent)));
         }
@@ -228,8 +240,10 @@ public class SiteViewModel extends ViewModel {
             } else {
                 ArrayMap<String, String> params = new ArrayMap<>();
                 params.put("wd", Trans.t2s(keyword));
+                params.put("quick", "false");
+                params.put("extend", "");
                 params.put("pg", page);
-                String searchContent = call(site, params, true);
+                String searchContent = call(site, params);
                 SpiderDebug.log(site.getName() + "," + searchContent);
                 Result result = fetchPic(site, Result.fromType(site.getType(), searchContent));
                 for (Vod vod : result.getList()) vod.setSite(site);
@@ -238,28 +252,18 @@ public class SiteViewModel extends ViewModel {
         });
     }
 
-    private String call(Site site, ArrayMap<String, String> params, boolean limit) throws IOException {
-        Call call = fetchExt(site, params, limit).length() <= 1000 ? OkHttp.newCall(site.getApi(), site.getHeaders(), params) : OkHttp.newCall(site.getApi(), site.getHeaders(), OkHttp.toBody(params));
-        return call.execute().body().string();
-    }
-
-    private String fetchExt(Site site, ArrayMap<String, String> params, boolean limit) throws IOException {
-        String extend = site.getExt();
-        if (extend.startsWith("http")) extend = fetchExt(site);
-        if (limit && extend.length() > 1000) extend = extend.substring(0, 1000);
-        if (!extend.isEmpty()) params.put("extend", extend);
-        return extend;
-    }
-
-    private String fetchExt(Site site) throws IOException {
-        Response res = OkHttp.newCall(site.getExt(), site.getHeaders()).execute();
-        if (res.code() != 200) return "";
-        site.setExt(res.body().string());
-        return site.getExt();
+    private String call(Site site, ArrayMap<String, String> params) throws IOException {
+        if (!site.getExt().isEmpty()) params.put("extend", site.getExt());
+        Call get = OkHttp.newCall(site.getApi(), site.getHeaders(), params);
+        Call post = OkHttp.newCall(site.getApi(), site.getHeaders(), OkHttp.toBody(params));
+        Response response = (site.getExt().length() <= 1000 ? get : post).execute();
+        String result = response.body().string();
+        response.close();
+        return result;
     }
 
     private Result fetchPic(Site site, Result result) throws Exception {
-        if (site.getType() > 2 || result.getList().isEmpty() || result.getList().get(0).getVodPic().length() > 0) return result;
+        if (site.getType() > 2 || result.getList().isEmpty() || !result.getList().get(0).getVodPic().isEmpty()) return result;
         ArrayList<String> ids = new ArrayList<>();
         if (site.getCategories().isEmpty()) for (Vod item : result.getList()) ids.add(item.getVodId());
         else for (Vod item : result.getList()) if (site.getCategories().contains(item.getTypeName())) ids.add(item.getVodId());
@@ -267,15 +271,16 @@ public class SiteViewModel extends ViewModel {
         ArrayMap<String, String> params = new ArrayMap<>();
         params.put("ac", site.getType() == 0 ? "videolist" : "detail");
         params.put("ids", TextUtils.join(",", ids));
-        String response = OkHttp.newCall(site.getApi(), site.getHeaders(), params).execute().body().string();
-        result.setList(Result.fromType(site.getType(), response).getList());
+        Response response = OkHttp.newCall(site.getApi(), site.getHeaders(), params).execute();
+        result.setList(Result.fromType(site.getType(), response.body().string()).getList());
+        response.close();
         return result;
     }
 
     private void post(Site site, Result result) {
         if (result.getList().isEmpty()) return;
         for (Vod vod : result.getList()) vod.setSite(site);
-        this.search.postValue(result);
+        search.postValue(result);
     }
 
     private void execute(MutableLiveData<Result> result, Callable<Result> callable) {

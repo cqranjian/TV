@@ -3,8 +3,11 @@ package com.fongmi.android.tv.player.extractor;
 import android.util.Base64;
 
 import com.fongmi.android.tv.bean.Episode;
+import com.fongmi.android.tv.bean.Vod;
+import com.fongmi.android.tv.event.RefreshEvent;
 import com.fongmi.android.tv.impl.NewPipeImpl;
 import com.fongmi.android.tv.player.Source;
+import com.github.catvod.utils.Trans;
 
 import org.schabi.newpipe.extractor.ListExtractor;
 import org.schabi.newpipe.extractor.NewPipe;
@@ -44,7 +47,24 @@ public class Youtube implements Source.Extractor {
     @Override
     public String fetch(String url) throws Exception {
         StreamInfo info = StreamInfo.getInfo(url);
+        RefreshEvent.vod(convert(info));
         return isLive(info) ? getLive(info) : getMpd(info);
+    }
+
+    private Vod convert(StreamInfo info) {
+        try {
+            Vod vod = new Vod();
+            vod.setVodName(Trans.s2t(info.getName()));
+            vod.setVodDirector(Trans.s2t(info.getUploaderName()));
+            vod.setVodContent(Trans.s2t(info.getDescription().getContent()));
+            vod.setVodPic(info.getThumbnails().get(info.getThumbnails().size() - 1).getUrl());
+            return vod;
+        } catch (Exception e) {
+            Vod vod = new Vod();
+            vod.setVodName(Trans.s2t(info.getName()));
+            vod.setVodContent(Trans.s2t(info.getDescription().getContent()));
+            return vod;
+        }
     }
 
     private boolean isLive(StreamInfo info) {
@@ -144,6 +164,7 @@ public class Youtube implements Source.Extractor {
 
         private void add(List<Episode> episodes, ListExtractor.InfoItemsPage<StreamInfoItem> page) {
             for (StreamInfoItem item : page.getItems()) {
+                if (item.getDuration() == -1) continue;
                 episodes.add(Episode.create(item.getName(), item.getUrl()));
             }
             if (page.hasNextPage()) {

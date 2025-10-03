@@ -30,15 +30,16 @@ public class Connect {
     }
 
     public static JSObject success(QuickJSContext ctx, Req req, Response res) {
-        try {
+        try (res) {
             JSObject jsObject = ctx.createNewJSObject();
             JSObject jsHeader = ctx.createNewJSObject();
             setHeader(ctx, res, jsHeader);
             jsObject.setProperty("code", res.code());
             jsObject.setProperty("headers", jsHeader);
             if (req.getBuffer() == 0) jsObject.setProperty("content", new String(res.body().bytes(), req.getCharset()));
+            if (req.getBuffer() == 1) jsObject.setProperty("content", JSUtil.toArray(ctx, res.body().bytes()));
             if (req.getBuffer() == 2) jsObject.setProperty("content", Util.base64(res.body().bytes()));
-            if (req.getBuffer() == 1) jsObject.setProperty("content", res.body().bytes());
+            if (req.getBuffer() == 3) jsObject.setProperty("content", res.body().bytes());
             return jsObject;
         } catch (Exception e) {
             return error(ctx);
@@ -84,7 +85,7 @@ public class Connect {
     }
 
     private static RequestBody getFormDataBody(Req req) {
-        String boundary = "--dio-boundary-" + new SecureRandom().nextInt(42949) + "" + new SecureRandom().nextInt(67296);
+        String boundary = "--dio-boundary-" + new SecureRandom().nextInt(42949) + new SecureRandom().nextInt(67296);
         MultipartBody.Builder builder = new MultipartBody.Builder(boundary).setType(MultipartBody.FORM);
         Map<String, String> params = Json.toMap(req.getData());
         for (String key : params.keySet()) builder.addFormDataPart(key, params.get(key));

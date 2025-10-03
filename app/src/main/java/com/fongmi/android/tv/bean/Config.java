@@ -3,6 +3,7 @@ package com.fongmi.android.tv.bean;
 import android.text.TextUtils;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.room.Entity;
 import androidx.room.Index;
 import androidx.room.PrimaryKey;
@@ -194,9 +195,13 @@ public class Config {
     }
 
     public static void delete(String url, int type) {
-        if (type == 2) Path.clear(FileUtil.getWall(0));
-        if (type == 2) AppDatabase.get().getConfigDao().delete(type);
-        else AppDatabase.get().getConfigDao().delete(url, type);
+        if (type != 2) {
+            AppDatabase.get().getConfigDao().delete(url, type);
+        } else {
+            Path.clear(FileUtil.getWall(0));
+            Path.clear(FileUtil.getWallCache());
+            AppDatabase.get().getConfigDao().delete(type);
+        }
     }
 
     public static Config vod() {
@@ -274,10 +279,9 @@ public class Config {
     }
 
     @Override
-    public boolean equals(Object obj) {
+    public boolean equals(@Nullable Object obj) {
         if (this == obj) return true;
-        if (!(obj instanceof Config)) return false;
-        Config it = (Config) obj;
+        if (!(obj instanceof Config it)) return false;
         return getId() == it.getId();
     }
 }

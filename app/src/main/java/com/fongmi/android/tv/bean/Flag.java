@@ -5,6 +5,7 @@ import android.os.Parcelable;
 import android.text.TextUtils;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import com.fongmi.android.tv.App;
 import com.fongmi.android.tv.utils.Util;
@@ -91,7 +92,7 @@ public class Flag implements Parcelable {
     public void createEpisode(String data) {
         String[] urls = data.contains("#") ? data.split("#") : new String[]{data};
         for (int i = 0; i < urls.length; i++) {
-            String[] split = urls[i].split("\\$");
+            String[] split = urls[i].split("\\$", 2);
             String number = String.format(Locale.getDefault(), "%02d", i + 1);
             Episode episode = split.length > 1 ? Episode.create(split[0].isEmpty() ? number : split[0].trim(), split[1]) : Episode.create(number, urls[i]);
             if (!getEpisodes().contains(episode)) getEpisodes().add(episode);
@@ -127,10 +128,9 @@ public class Flag implements Parcelable {
     }
 
     @Override
-    public boolean equals(Object obj) {
+    public boolean equals(@Nullable Object obj) {
         if (this == obj) return true;
-        if (!(obj instanceof Flag)) return false;
-        Flag it = (Flag) obj;
+        if (!(obj instanceof Flag it)) return false;
         return getFlag().equals(it.getFlag());
     }
 

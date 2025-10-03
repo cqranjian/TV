@@ -4,15 +4,18 @@ import android.text.TextUtils;
 import android.view.View;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.media3.common.C;
 import androidx.room.Entity;
 import androidx.room.PrimaryKey;
 
 import com.fongmi.android.tv.App;
+import com.fongmi.android.tv.Constant;
 import com.fongmi.android.tv.R;
 import com.fongmi.android.tv.api.config.VodConfig;
 import com.fongmi.android.tv.db.AppDatabase;
 import com.fongmi.android.tv.event.RefreshEvent;
+import com.fongmi.android.tv.impl.Diffable;
 import com.google.gson.annotations.SerializedName;
 import com.google.gson.reflect.TypeToken;
 
@@ -22,7 +25,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 @Entity
-public class History {
+public class History implements Diffable<History> {
 
     @NonNull
     @PrimaryKey
@@ -244,7 +247,7 @@ public class History {
     }
 
     public static List<History> get(int cid) {
-        return AppDatabase.get().getHistoryDao().find(cid, System.currentTimeMillis() - TimeUnit.DAYS.toMillis(14));
+        return AppDatabase.get().getHistoryDao().find(cid, System.currentTimeMillis() - Constant.HISTORY_TIME);
     }
 
     public static History find(String key) {
@@ -263,7 +266,7 @@ public class History {
 
     private void merge(List<History> items, boolean force) {
         for (History item : items) {
-            if (getDuration() > 0 && item.getDuration() > 0 && Math.abs(getDuration() - item.getDuration()) > 10 * 60 * 1000) continue;
+            if (getDuration() > 0 && item.getDuration() > 0 && Math.abs(getDuration() - item.getDuration()) > TimeUnit.MINUTES.toMillis(10)) continue;
             if (!force && getKey().equals(item.getKey())) continue;
             checkParam(item);
             item.delete();
@@ -344,9 +347,26 @@ public class History {
         });
     }
 
+    @Override
+    public boolean equals(@Nullable Object obj) {
+        if (this == obj) return true;
+        if (!(obj instanceof History it)) return false;
+        return getKey().equals(it.getKey()) && getVodName().equals(it.getVodName()) && getVodPic().equals(it.getVodPic()) && getCreateTime() == it.getCreateTime();
+    }
+
     @NonNull
     @Override
     public String toString() {
         return App.gson().toJson(this);
+    }
+
+    @Override
+    public boolean isSameItem(History other) {
+        return getKey().equals(other.getKey());
+    }
+
+    @Override
+    public boolean isSameContent(History other) {
+        return equals(other);
     }
 }

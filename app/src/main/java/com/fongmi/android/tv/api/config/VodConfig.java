@@ -15,6 +15,8 @@ import com.fongmi.android.tv.impl.Callback;
 import com.fongmi.android.tv.utils.Notify;
 import com.fongmi.android.tv.utils.UrlUtil;
 import com.github.catvod.bean.Doh;
+import com.github.catvod.bean.Header;
+import com.github.catvod.bean.Proxy;
 import com.github.catvod.net.OkHttp;
 import com.github.catvod.utils.Json;
 import com.google.gson.JsonElement;
@@ -23,20 +25,24 @@ import com.google.gson.JsonObject;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class VodConfig {
 
+    private Site home;
+    private String wall;
+    private Parse parse;
+    private Config config;
     private List<Doh> doh;
     private List<Rule> rules;
     private List<Site> sites;
-    private List<Parse> parses;
-    private List<String> flags;
     private List<String> ads;
+    private List<String> flags;
+    private List<Parse> parses;
+    private ExecutorService executor;
+
     private boolean loadLive;
-    private Config config;
-    private Parse parse;
-    private String wall;
-    private Site home;
 
     private static class Loader {
         static volatile VodConfig INSTANCE = new VodConfig();
@@ -106,12 +112,14 @@ public class VodConfig {
     }
 
     public void load(Callback callback) {
-        App.execute(() -> loadConfig(callback));
+        if (executor != null) executor.shutdownNow();
+        executor = Executors.newSingleThreadExecutor();
+        executor.execute(() -> loadConfig(callback));
     }
 
     private void loadConfig(Callback callback) {
         try {
-            checkJson(Json.parse(Decoder.getJson(config.getUrl())).getAsJsonObject(), callback);
+            checkJson(Json.parse(Decoder.getJson(UrlUtil.convert(config.getUrl()))).getAsJsonObject(), callback);
         } catch (Throwable e) {
             if (TextUtils.isEmpty(config.getUrl())) App.post(() -> callback.error(""));
             else loadCache(callback, e);
@@ -125,7 +133,7 @@ public class VodConfig {
     }
 
     private void checkJson(JsonObject object, Callback callback) {
-        if (object.has("msg") && callback != null) {
+        if (object.has("msg")) {
             App.post(() -> callback.error(object.get("msg").getAsString()));
         } else if (object.has("urls")) {
             parseDepot(object, callback);
@@ -148,8 +156,7 @@ public class VodConfig {
             initSite(object);
             initParse(object);
             initOther(object);
-            BaseLoader.get().parseJar(Json.safeString(object, "spider"));
-            if (loadLive && object.has("lives")) initLive(object);
+            if (loadLive && !Json.isEmpty(object, "lives")) initLive(object);
             String notice = Json.safeString(object, "notice");
             config.logo(Json.safeString(object, "logo"));
             App.post(() -> callback.success(notice));
@@ -167,6 +174,7 @@ public class VodConfig {
             return;
         }
         String spider = Json.safeString(object, "spider");
+        BaseLoader.get().parseJar(spider, true);
         for (JsonElement element : Json.safeListElement(object, "sites")) {
             Site site = Site.objectFrom(element);
             if (sites.contains(site)) continue;
@@ -200,9 +208,12 @@ public class VodConfig {
         if (!parses.isEmpty()) parses.add(0, Parse.god());
         if (home == null) setHome(sites.isEmpty() ? new Site() : sites.get(0));
         if (parse == null) setParse(parses.isEmpty() ? new Parse() : parses.get(0));
+        setHeaders(Header.arrayFrom(object.getAsJsonArray("headers")));
+        setProxy(Proxy.arrayFrom(object.getAsJsonArray("proxy")));
         setRules(Rule.arrayFrom(object.getAsJsonArray("rules")));
         setDoh(Doh.arrayFrom(object.getAsJsonArray("doh")));
         setFlags(Json.safeListString(object, "flags"));
+        setHosts(Json.safeListString(object, "hosts"));
         setWall(Json.safeString(object, "wallpaper"));
         setAds(Json.safeListString(object, "ads"));
     }
@@ -219,7 +230,7 @@ public class VodConfig {
         return items;
     }
 
-    public void setDoh(List<Doh> doh) {
+    private void setDoh(List<Doh> doh) {
         this.doh = doh;
     }
 
@@ -227,9 +238,7 @@ public class VodConfig {
         return rules == null ? Collections.emptyList() : rules;
     }
 
-    public void setRules(List<Rule> rules) {
-        for (Rule rule : rules) if ("proxy".equals(rule.getName())) OkHttp.selector().addAll(rule.getHosts());
-        rules.remove(Rule.create("proxy"));
+    private void setRules(List<Rule> rules) {
         this.rules = rules;
     }
 
@@ -254,12 +263,25 @@ public class VodConfig {
         return items;
     }
 
+    private void setHeaders(List<Header> headers) {
+        OkHttp.responseInterceptor().addAll(headers);
+    }
+
+    private void setProxy(List<Proxy> proxy) {
+        OkHttp.authenticator().addAll(proxy);
+        OkHttp.selector().addAll(proxy);
+    }
+
     public List<String> getFlags() {
         return flags == null ? Collections.emptyList() : flags;
     }
 
     private void setFlags(List<String> flags) {
         this.flags.addAll(flags);
+    }
+
+    private void setHosts(List<String> hosts) {
+        OkHttp.dns().addAll(hosts);
     }
 
     public List<String> getAds() {

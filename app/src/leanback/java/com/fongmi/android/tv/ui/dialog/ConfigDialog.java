@@ -1,13 +1,14 @@
 package com.fongmi.android.tv.ui.dialog;
 
-import android.Manifest;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
 
+import androidx.activity.result.ActivityResultLauncher;
 import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.FragmentActivity;
 
@@ -21,10 +22,10 @@ import com.fongmi.android.tv.event.ServerEvent;
 import com.fongmi.android.tv.impl.ConfigCallback;
 import com.fongmi.android.tv.server.Server;
 import com.fongmi.android.tv.ui.custom.CustomTextListener;
+import com.fongmi.android.tv.utils.FileChooser;
 import com.fongmi.android.tv.utils.QRCode;
 import com.fongmi.android.tv.utils.ResUtil;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
-import com.permissionx.guolindev.PermissionX;
 
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
@@ -32,8 +33,8 @@ import org.greenrobot.eventbus.ThreadMode;
 
 public class ConfigDialog implements DialogInterface.OnDismissListener {
 
+    private ActivityResultLauncher<Intent> launcher;
     private final DialogConfigBinding binding;
-    private final FragmentActivity activity;
     private final ConfigCallback callback;
     private final AlertDialog dialog;
     private boolean append;
@@ -55,8 +56,12 @@ public class ConfigDialog implements DialogInterface.OnDismissListener {
         return this;
     }
 
+    public ConfigDialog launcher(ActivityResultLauncher<Intent> launcher) {
+        this.launcher = launcher;
+        return this;
+    }
+
     public ConfigDialog(FragmentActivity activity) {
-        this.activity = activity;
         this.callback = (ConfigCallback) activity;
         this.binding = DialogConfigBinding.inflate(LayoutInflater.from(activity));
         this.dialog = new MaterialAlertDialogBuilder(activity).setView(binding.getRoot()).create();
@@ -84,12 +89,11 @@ public class ConfigDialog implements DialogInterface.OnDismissListener {
         binding.positive.setText(edit ? R.string.dialog_edit : R.string.dialog_positive);
         binding.code.setImageBitmap(QRCode.getBitmap(Server.get().getAddress(3), 200, 0));
         binding.info.setText(ResUtil.getString(R.string.push_info, Server.get().getAddress()).replace("，", "\n"));
-        binding.storage.setVisibility(PermissionX.isGranted(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE) ? View.GONE : View.VISIBLE);
     }
 
     private void initEvent() {
         EventBus.getDefault().register(this);
-        binding.storage.setOnClickListener(this::onStorage);
+        binding.choose.setOnClickListener(this::onChoose);
         binding.positive.setOnClickListener(this::onPositive);
         binding.negative.setOnClickListener(this::onNegative);
         binding.text.addTextChangedListener(new CustomTextListener() {
@@ -117,8 +121,9 @@ public class ConfigDialog implements DialogInterface.OnDismissListener {
         }
     }
 
-    private void onStorage(View view) {
-        PermissionX.init(activity).permissions(Manifest.permission.WRITE_EXTERNAL_STORAGE).request((allGranted, grantedList, deniedList) -> binding.storage.setVisibility(allGranted ? View.GONE : View.VISIBLE));
+    private void onChoose(View view) {
+        FileChooser.from(launcher).show();
+        dialog.dismiss();
     }
 
     private void detect(String s) {
@@ -133,7 +138,7 @@ public class ConfigDialog implements DialogInterface.OnDismissListener {
             binding.text.append("ssets://");
         } else if (s.length() > 1) {
             append = false;
-        } else if (s.length() == 0) {
+        } else if (s.isEmpty()) {
             append = true;
         }
     }

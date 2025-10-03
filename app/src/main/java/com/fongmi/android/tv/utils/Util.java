@@ -1,7 +1,6 @@
 package com.fongmi.android.tv.utils;
 
 import android.app.Activity;
-import android.app.UiModeManager;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.ComponentName;
@@ -9,24 +8,29 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
-import android.content.res.Configuration;
 import android.os.Build;
 import android.os.IBinder;
-import android.os.Parcelable;
 import android.provider.Settings;
+import android.text.Html;
 import android.text.TextUtils;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
+
 import com.fongmi.android.tv.App;
+import com.fongmi.android.tv.BuildConfig;
 import com.fongmi.android.tv.R;
 import com.github.catvod.utils.Shell;
 
 import java.net.NetworkInterface;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Formatter;
 import java.util.List;
 
@@ -37,17 +41,28 @@ public class Util {
         else showSystemUI(activity);
     }
 
-    public static void showSystemUI(Activity activity) {
-        activity.getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
-    }
-
     public static void hideSystemUI(Activity activity) {
         hideSystemUI(activity.getWindow());
     }
 
     public static void hideSystemUI(Window window) {
-        int flags = View.SYSTEM_UI_FLAG_LOW_PROFILE | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION;
-        window.getDecorView().setSystemUiVisibility(flags);
+        WindowInsetsControllerCompat insets = WindowCompat.getInsetsController(window, window.getDecorView());
+        insets.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+        insets.hide(WindowInsetsCompat.Type.systemBars());
+    }
+
+    public static void showSystemUI(Activity activity) {
+        showSystemUI(activity.getWindow());
+    }
+
+    public static void showSystemUI(Window window) {
+        WindowCompat.getInsetsController(window, window.getDecorView()).show(WindowInsetsCompat.Type.systemBars());
+    }
+
+    public static void showKeyboard(View view) {
+        if (!view.requestFocus()) return;
+        InputMethodManager imm = (InputMethodManager) App.get().getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null) view.postDelayed(() -> imm.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT), 250);
     }
 
     public static void hideKeyboard(View view) {
@@ -93,6 +108,34 @@ public class Util {
         }
     }
 
+    public static List<String> getPart(String text) {
+        List<String> items = new ArrayList<>();
+        String[] splits = new String[0];
+        items.add(text);
+        if (text.contains("：")) {
+            splits = text.split("：");
+        } else if (text.contains("第") && text.contains("季")) {
+            splits = Arrays.stream(text.split("第")).filter(s -> !s.isEmpty() && !s.contains("季")).toArray(String[]::new);
+        } else if (text.contains("(")) {
+            splits = new String[]{text.split("\\(")[0]};
+        } else if (text.contains(" ")) {
+            splits = text.split(" ");
+        }
+        for (String s : splits) {
+            s = s.trim();
+            if (s.contains(" ")) s = s.split(" ")[0].trim();
+            if (!s.isEmpty()) items.add(s);
+        }
+        return items;
+    }
+
+    public static String clean(String text) {
+        StringBuilder sb = new StringBuilder();
+        text = Html.fromHtml(text, Html.FROM_HTML_MODE_LEGACY).toString().replace("\u00A0", "").replace("\u3000", "");
+        for (String line : text.split("\\r?\\n")) if (!line.isEmpty()) sb.append(line.trim()).append("\n");
+        return substring(sb.toString());
+    }
+
     public static String getAndroidId() {
         try {
             String id = Settings.Secure.getString(App.get().getContentResolver(), Settings.Secure.ANDROID_ID);
@@ -111,6 +154,7 @@ public class Util {
         try {
             StringBuilder sb = new StringBuilder();
             NetworkInterface nif = NetworkInterface.getByName(name);
+            if (nif.getHardwareAddress() == null) return "";
             for (byte b : nif.getHardwareAddress()) sb.append(String.format("%02X:", b));
             return substring(sb.toString());
         } catch (Exception e) {
@@ -133,20 +177,17 @@ public class Util {
         return text;
     }
 
-    public static long format(SimpleDateFormat format, String src) {
-        try {
-            return format.parse(src).getTime();
-        } catch (Exception e) {
-            return 0;
-        }
+    public static long format(String src, List<SimpleDateFormat> formats) {
+        for (SimpleDateFormat format : formats) try { return format.parse(src).getTime(); } catch (Exception ignored) {}
+        return 0;
     }
 
-    public static String format(SimpleDateFormat format, long time) {
-        try {
-            return format.format(time);
-        } catch (Exception e) {
-            return "";
-        }
+    public static boolean isLeanback() {
+        return "leanback".equals(BuildConfig.FLAVOR_mode);
+    }
+
+    public static boolean isMobile() {
+        return "mobile".equals(BuildConfig.FLAVOR_mode);
     }
 
     public static String format(StringBuilder builder, Formatter formatter, long timeMs) {
@@ -159,48 +200,12 @@ public class Util {
 
     public static Intent getChooser(Intent intent) {
         List<ComponentName> components = new ArrayList<>();
-        for (ResolveInfo resolveInfo : App.get().getPackageManager().queryIntentActivities(intent, 0)) {
+        for (ResolveInfo resolveInfo : App.get().getPackageManager().queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)) {
             String pkgName = resolveInfo.activityInfo.packageName;
             if (pkgName.equals(App.get().getPackageName())) {
                 components.add(new ComponentName(pkgName, resolveInfo.activityInfo.name));
             }
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            return Intent.createChooser(intent, null).putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, components.toArray(new Parcelable[]{}));
-        } else {
-            return Intent.createChooser(intent, null);
-        }
-    }
-
-    public static boolean hasSAFChooser() {
-        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("video/*");
-        return intent.resolveActivity(App.get().getPackageManager()) != null;
-    }
-
-    public static boolean isTvBox() {
-        PackageManager pm = App.get().getPackageManager();
-        if (Configuration.UI_MODE_TYPE_TELEVISION == ((UiModeManager) App.get().getSystemService(Context.UI_MODE_SERVICE)).getCurrentModeType()) {
-            return true;
-        }
-        if (pm.hasSystemFeature("amazon.hardware.fire_tv")) {
-            return true;
-        }
-        if (!hasSAFChooser()) {
-            return true;
-        }
-        if (Build.VERSION.SDK_INT < 30) {
-            if (!pm.hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN) && !pm.hasSystemFeature(PackageManager.FEATURE_TELEPHONY)) {
-                return true;
-            }
-            if (pm.hasSystemFeature("android.hardware.hdmi.cec")) {
-                return true;
-            }
-            if (Build.MANUFACTURER.equalsIgnoreCase("zidoo")) {
-                return true;
-            }
-        }
-        return false;
+        return Intent.createChooser(intent, null).putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, components.toArray(new ComponentName[0]));
     }
 }

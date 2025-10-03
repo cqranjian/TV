@@ -10,6 +10,9 @@ https://github.com/CatVodTVOfficial/CatVodTVJarLoader
 |------------|------|------|------------|
 | searchable | 1    | 是否搜索 | 0：關閉；1：啟用  |
 | changeable | 1    | 是否換源 | 0：關閉；1：啟用  |
+| quickserch | 1    | 是否快搜 | 0：關閉；1：啟用  |
+| indexs     | 0    | 是否聚搜 | 0：關閉；1：啟用  |
+| hide       | 0    | 是否隱藏 | 0：顯示；1：隱藏  |
 | timeout    | 15   | 播放超時 | 單位：秒       |
 | header     | none | 請求標頭 | 格式：json    |
 | click      | none | 點擊js | javascript |
@@ -120,6 +123,12 @@ http://127.0.0.1:9978/action?do=refresh&type=live
 http://127.0.0.1:9978/action?do=refresh&type=subtitle&path=http://xxx
 ```
 
+推送彈幕
+
+```
+http://127.0.0.1:9978/action?do=refresh&type=danmaku&path=http://xxx
+```
+
 新增緩存字串
 
 ```
@@ -140,35 +149,115 @@ http://127.0.0.1:9978/cache?do=del&key=xxx
 
 ### Proxy
 
-scheme 支持 http, https, socks4, socks5
+支持 http, https, socks4, socks5
 
 ```
 scheme://username:password@host:port
 ```
 
-配置 rules 新增 proxy 判斷 host 是否走代理
+配置新增 proxy 可指定代理
+靠前的 host 匹配到則使用該代理
 
 ```json
 {
-  "name": "proxy",
-  "hosts": [
-    "api.nivodz.com"
+  "spider": "",
+  "proxy": [
+    {
+      "name": "自訂",
+      "hosts": [
+        "googlevideo.com",
+        "raw.githubusercontent.com"
+      ],
+      "urls": [
+        "http://127.0.0.1:7890"
+      ]
+    },
+    {
+      "name": "全局",
+      "hosts": [
+        ".*."
+      ],
+      "urls": [
+        "socks5://127.0.0.1:7891"
+      ]
+    }
   ]
 }
 ```
 
+### Hosts
+
+```json
+{
+  "spider": "",
+  "hosts": [
+    "cache.ott.*.itv.cmvideo.cn=base-v4-free-mghy.e.cdn.chinamobile.com"
+  ]
+}
+```
+
+### Headers
+
+```json
+{
+  "spider": "",
+  "headers": [
+    {
+      "host": "gslbserv.itv.cmvideo.cn",
+      "header": {
+        "User-Agent": "okhttp/3.12.13",
+        "Referer": "test"
+      }
+    }
+  ]
+}
+```
+
+### 爬蟲本地代理
+
+Java
+
+```
+proxy://
+```
+
+```
+Proxy.getUrl(boolean local)
+```
+
+Python
+
+```
+proxy://do=py
+```
+
+```
+getProxyUrl(boolean local)
+```
+
+JS
+
+```
+proxy://do=js
+```
+
+```
+getProxy(boolean local)
+```
+
 ### 配置範例
 
-[點播-線上](other/sample/vod/online.json)  
-[點播-本地](other/sample/vod/offline.json)  
-[直播-線上](other/sample/live/online.json)  
-[直播-本地](other/sample/live/offline.json)
+[本地/線上](other/sample/config.json)
 
 ### 飛機群
 
-[討論群組](https://t.me/fongmi_offical)  
+[討論群組](https://t.me/fongmi_official)  
 [發布頻道](https://t.me/fongmi_release)
 
 ### 贊助
 
 ![photo_2024-01-10_11-39-12](https://github.com/FongMi/TV/assets/3471963/fdc12771-386c-4d5d-9a4d-d0bec0276fa7)
+
+### Star
+
+[![Star History Chart](https://api.star-history.com/svg?repos=FongMi/TV&type=Date)](https://www.star-history.com/#FongMi/TV&Date)

@@ -33,6 +33,10 @@ public class FileUtil {
         return Path.files("wallpaper_" + index);
     }
 
+    public static File getWallCache() {
+        return Path.files("wallpaper_cache");
+    }
+
     public static void openFile(File file) {
         Intent intent = new Intent(Intent.ACTION_VIEW);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -91,11 +95,11 @@ public class FileUtil {
         });
     }
 
-    public static long getDirectorySize(File file) {
+    public static long getDirectorySize(File dir) {
         long size = 0;
-        if (file == null) return 0;
-        if (file.isDirectory()) for (File f : Path.list(file)) size += getDirectorySize(f);
-        else size = file.length();
+        if (dir == null) return 0;
+        if (dir.isDirectory()) for (File file: Path.list(dir)) size += getDirectorySize(file);
+        else size = dir.length();
         return size;
     }
 

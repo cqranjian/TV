@@ -3,11 +3,9 @@
     <!-- App -->
     <string name="app_name">影视</string>
 
-    <!-- Vod -->
-    <string name="vod_last">上次看到<xliff:g name="name">%s</xliff:g></string>
-
     <!-- Live -->
     <string name="live_pass">密码</string>
+    <string name="live_refresh">刷新</string>
     <string name="live_line">线路 <xliff:g name="name">%s</xliff:g></string>
 
     <!-- Detail -->
@@ -28,6 +26,7 @@
 
     <!-- Play -->
     <string name="play">播放</string>
+    <string name="pause">暂停</string>
     <string name="play_op">片头</string>
     <string name="play_ed">片尾</string>
     <string name="play_exo">EXO</string>
@@ -52,6 +51,10 @@
     <string name="play_switch_flag">正在切换线路至「<xliff:g name="name">%s</xliff:g>」</string>
     <string name="play_switch_site">正在切换站源至「<xliff:g name="name">%s</xliff:g>」</string>
 
+    <!-- Danmaku -->
+    <string name="danmaku">弹幕</string>
+    <string name="danmaku_select">选择弹幕</string>
+
     <!-- Parse -->
     <string name="parse">解析</string>
     <string name="parse_god">超级解析</string>
@@ -66,7 +69,6 @@
     <string name="setting_wall">壁纸</string>
     <string name="setting_player">播放设置</string>
     <string name="setting_incognito">无痕模式</string>
-    <string name="setting_quality">图片品质</string>
     <string name="setting_size">图片尺寸</string>
     <string name="setting_doh">DoH</string>
     <string name="setting_proxy">Proxy</string>
@@ -74,7 +76,7 @@
     <string name="setting_backup">备份</string>
     <string name="setting_restore">恢复</string>
     <string name="setting_version">版本</string>
-    <string name="setting_storage">权限</string>
+    <string name="setting_choose">选择</string>
     <string name="setting_off">关</string>
     <string name="setting_on">开</string>
 
@@ -89,13 +91,17 @@
     <string name="player">播放核心</string>
     <string name="player_render">渲染方式</string>
     <string name="player_scale">缩放比例</string>
+    <string name="player_libass">字幕渲染</string>
     <string name="player_caption">字幕样式</string>
     <string name="player_background">后台播放</string>
     <string name="player_audio_decode">音频软解</string>
+    <string name="player_video_decode">视频软解</string>
+    <string name="player_aac_track">AAC优先</string>
+    <string name="player_danmaku_load">弹幕加载</string>
+    <string name="player_adblock">智能去广</string>
     <string name="player_tunnel">隧道模式</string>
     <string name="player_buffer">缓冲时间</string>
     <string name="player_speed">长按倍速</string>
-    <string name="player_rtsp">RTSP 通道</string>
     <string name="player_ua">User-Agent</string>
 
     <!-- Search -->
@@ -118,14 +124,12 @@
     <string name="error_play_next">已经是最后一集了！</string>
     <string name="error_play_prev">已经是第一集了！</string>
     <string name="error_play_parse">播放地址解析失败</string>
-    <string name="error_play_drm_scheme">此设备不支持所需的 DRM scheme</string>
-    <string name="error_play_url_code">播放地址加载失败\n错误代码：<xliff:g name="name">%s</xliff:g></string>
-    <string name="error_play_code">错误代码：<xliff:g name="name">%s</xliff:g></string>
+    <string name="error_play_drm">此设备不支持所需的 DRM scheme</string>
     <string name="error_play_url">播放地址加载失败</string>
     <string name="error_play_flag">暂无线路数据</string>
     <string name="error_play_timeout">连接超时</string>
     <string name="error_detail">暂无播放数据</string>
-    <string name="error_empty">找不到数据</string>
+    <string name="error_empty">这里什麽都没有 👀</string>
 
     <!-- Update -->
     <string name="update_version">发现新版本 <xliff:g name="name">%s</xliff:g></string>
@@ -151,12 +155,6 @@
     <string-array name="select_decode">
         <item>软解</item>
         <item>硬解</item>
-    </string-array>
-
-    <string-array name="select_quality">
-        <item>低</item>
-        <item>中</item>
-        <item>高</item>
     </string-array>
 
     <string-array name="select_size">

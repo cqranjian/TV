@@ -8,7 +8,6 @@ import com.fongmi.android.tv.R;
 import com.fongmi.android.tv.Setting;
 import com.fongmi.android.tv.api.Decoder;
 import com.fongmi.android.tv.api.LiveParser;
-import com.fongmi.android.tv.api.XtreamParser;
 import com.fongmi.android.tv.api.loader.BaseLoader;
 import com.fongmi.android.tv.bean.Channel;
 import com.fongmi.android.tv.bean.Config;
@@ -22,6 +21,8 @@ import com.fongmi.android.tv.impl.Callback;
 import com.fongmi.android.tv.ui.activity.LiveActivity;
 import com.fongmi.android.tv.utils.Notify;
 import com.fongmi.android.tv.utils.UrlUtil;
+import com.github.catvod.bean.Header;
+import com.github.catvod.bean.Proxy;
 import com.github.catvod.net.OkHttp;
 import com.github.catvod.utils.Json;
 import com.google.gson.JsonElement;
@@ -31,15 +32,19 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class LiveConfig {
 
+    private Live home;
+    private Config config;
     private List<Live> lives;
     private List<Rule> rules;
     private List<String> ads;
-    private Config config;
+    private ExecutorService executor;
+
     private boolean sync;
-    private Live home;
 
     private static class Loader {
         static volatile LiveConfig INSTANCE = new LiveConfig();
@@ -74,7 +79,7 @@ public class LiveConfig {
     }
 
     public static boolean hasUrl() {
-        return getUrl() != null && getUrl().length() > 0;
+        return getUrl() != null && !getUrl().isEmpty();
     }
 
     public static void load(Config config, Callback callback) {
@@ -109,13 +114,14 @@ public class LiveConfig {
     }
 
     public void load(Callback callback) {
-        App.execute(() -> loadConfig(callback));
+        if (executor != null) executor.shutdownNow();
+        executor = Executors.newSingleThreadExecutor();
+        executor.execute(() -> loadConfig(callback));
     }
 
     private void loadConfig(Callback callback) {
         try {
-            boolean xtream = XtreamParser.isApiUrl(config.getUrl());
-            parseConfig(xtream ? "" : Decoder.getJson(config.getUrl()), callback);
+            parseConfig(Decoder.getJson(UrlUtil.convert(config.getUrl())), callback);
         } catch (Throwable e) {
             if (TextUtils.isEmpty(config.getUrl())) App.post(() -> callback.error(""));
             else App.post(() -> callback.error(Notify.getError(R.string.error_config_get, e)));
@@ -124,7 +130,7 @@ public class LiveConfig {
     }
 
     private void parseConfig(String text, Callback callback) {
-        if (Json.invalid(text)) {
+        if (!Json.isObj(text)) {
             parseText(text, callback);
         } else {
             checkJson(Json.parse(text).getAsJsonObject(), callback);
@@ -132,7 +138,7 @@ public class LiveConfig {
     }
 
     private void parseText(String text, Callback callback) {
-        Live live = new Live(parseName(config.getUrl()), config.getUrl()).check().sync();
+        Live live = new Live(parseName(config.getUrl()), config.getUrl()).sync();
         LiveParser.text(live, text);
         lives.add(live);
         setHome(live, true);
@@ -149,7 +155,7 @@ public class LiveConfig {
     }
 
     private void checkJson(JsonObject object, Callback callback) {
-        if (object.has("msg") && callback != null) {
+        if (object.has("msg")) {
             App.post(() -> callback.error(object.get("msg").getAsString()));
         } else if (object.has("urls")) {
             parseDepot(object, callback);
@@ -171,7 +177,6 @@ public class LiveConfig {
         try {
             initLive(object);
             initOther(object);
-            BaseLoader.get().parseJar(Json.safeString(object, "spider"));
         } catch (Throwable e) {
             e.printStackTrace();
         } finally {
@@ -181,13 +186,14 @@ public class LiveConfig {
 
     private void initLive(JsonObject object) {
         String spider = Json.safeString(object, "spider");
+        BaseLoader.get().parseJar(spider, false);
         for (JsonElement element : Json.safeListElement(object, "lives")) {
             Live live = Live.objectFrom(element);
             if (lives.contains(live)) continue;
             live.setApi(UrlUtil.convert(live.getApi()));
             live.setExt(UrlUtil.convert(live.getExt()));
             live.setJar(parseJar(live, spider));
-            lives.add(live.check().sync());
+            lives.add(live.sync());
         }
         for (Live live : lives) {
             if (live.getName().equals(config.getHome())) {
@@ -198,7 +204,10 @@ public class LiveConfig {
 
     private void initOther(JsonObject object) {
         if (home == null) setHome(lives.isEmpty() ? new Live() : lives.get(0), true);
+        setHeaders(Header.arrayFrom(object.getAsJsonArray("headers")));
+        setProxy(Proxy.arrayFrom(object.getAsJsonArray("proxy")));
         setRules(Rule.arrayFrom(object.getAsJsonArray("rules")));
+        setHosts(Json.safeListString(object, "hosts"));
         setAds(Json.safeListString(object, "ads"));
     }
 
@@ -262,10 +271,21 @@ public class LiveConfig {
         return rules == null ? Collections.emptyList() : rules;
     }
 
-    public void setRules(List<Rule> rules) {
-        for (Rule rule : rules) if ("proxy".equals(rule.getName())) OkHttp.selector().addAll(rule.getHosts());
-        rules.remove(Rule.create("proxy"));
+    private void setRules(List<Rule> rules) {
         this.rules = rules;
+    }
+
+    private void setHeaders(List<Header> headers) {
+        OkHttp.responseInterceptor().addAll(headers);
+    }
+
+    private void setProxy(List<Proxy> proxy) {
+        OkHttp.authenticator().addAll(proxy);
+        OkHttp.selector().addAll(proxy);
+    }
+
+    private void setHosts(List<String> hosts) {
+        OkHttp.dns().addAll(hosts);
     }
 
     public List<String> getAds() {

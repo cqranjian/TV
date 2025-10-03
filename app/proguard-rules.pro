@@ -1,4 +1,5 @@
 # TV
+-keep class com.fongmi.quickjs.method.** { *; }
 -keep class com.fongmi.android.tv.bean.** { *; }
 
 # Gson
@@ -37,6 +38,10 @@
 -keep class org.fourthline.cling.** { *; }
 -keep class javax.xml.** { *; }
 
+# Cronet
+-keep class org.chromium.net.** { *; }
+-keep class com.google.net.cronet.** { *; }
+
 # EXO
 -dontwarn org.kxml2.io.**
 -dontwarn org.xmlpull.v1.**
@@ -55,14 +60,18 @@
 -keep class fi.iki.elonen.** { *; }
 
 # NewPipeExtractor
--keep class org.schabi.newpipe.extractor.timeago.patterns.** { *; }
+-keep class javax.script.** { *; }
+-keep class jdk.dynalink.** { *; }
+-keep class org.mozilla.javascript.* { *; }
 -keep class org.mozilla.javascript.** { *; }
+-keep class org.mozilla.javascript.engine.** { *; }
 -keep class org.mozilla.classfile.ClassFileWriter
+-keep class org.schabi.newpipe.extractor.timeago.patterns.** { *; }
+-keep class org.schabi.newpipe.extractor.services.youtube.protos.** { *; }
+-dontwarn org.mozilla.javascript.JavaToJSONConverters
 -dontwarn org.mozilla.javascript.tools.**
--dontwarn java.beans.**
-
-# QuickJS
--keep class com.fongmi.quickjs.method.** { *; }
+-dontwarn javax.script.**
+-dontwarn jdk.dynalink.**
 
 # Sardine
 -keep class com.thegrizzlylabs.sardineandroid.** { *; }
@@ -83,7 +92,3 @@
 
 # Zxing
 -keep class com.google.zxing.** { *; }
--keepclassmembers enum * {
-    public static **[] values();
-    public static ** valueOf(java.lang.String);
-}

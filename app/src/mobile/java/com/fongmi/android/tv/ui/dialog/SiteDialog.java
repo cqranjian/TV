@@ -16,8 +16,8 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 public class SiteDialog implements SiteAdapter.OnClickListener {
 
-    private final SiteCallback callback;
     private DialogSiteBinding binding;
+    private SiteCallback callback;
     private SiteAdapter adapter;
     private AlertDialog dialog;
 
@@ -30,13 +30,13 @@ public class SiteDialog implements SiteAdapter.OnClickListener {
     }
 
     public SiteDialog(Activity activity) {
-        this.callback = (SiteCallback) activity;
+        if (activity instanceof SiteCallback) this.callback = (SiteCallback) activity;
         init(activity);
     }
 
     public SiteDialog(Fragment fragment) {
-        this.callback = (SiteCallback) fragment;
-        init(fragment.getActivity());
+        if (fragment instanceof SiteCallback) this.callback = (SiteCallback) fragment;
+        init(fragment.requireActivity());
     }
 
     private void init(Activity activity) {
@@ -91,7 +91,6 @@ public class SiteDialog implements SiteAdapter.OnClickListener {
     public void onSearchClick(int position, Site item) {
         item.setSearchable(!item.isSearchable()).save();
         adapter.notifyItemChanged(position);
-        callback.onChanged();
     }
 
     @Override
@@ -103,16 +102,15 @@ public class SiteDialog implements SiteAdapter.OnClickListener {
     @Override
     public boolean onSearchLongClick(Site item) {
         boolean result = !item.isSearchable();
-        for (Site site : VodConfig.get().getSites()) site.setSearchable(result).save();
+        for (Site site : adapter.getItems()) site.setSearchable(result).save();
         adapter.notifyItemRangeChanged(0, adapter.getItemCount());
-        callback.onChanged();
         return true;
     }
 
     @Override
     public boolean onChangeLongClick(Site item) {
         boolean result = !item.isChangeable();
-        for (Site site : VodConfig.get().getSites()) site.setChangeable(result).save();
+        for (Site site : adapter.getItems()) site.setChangeable(result).save();
         adapter.notifyItemRangeChanged(0, adapter.getItemCount());
         return true;
     }

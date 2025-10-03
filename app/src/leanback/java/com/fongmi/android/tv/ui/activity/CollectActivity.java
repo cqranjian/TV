@@ -20,7 +20,6 @@ import androidx.viewbinding.ViewBinding;
 import androidx.viewpager.widget.ViewPager;
 
 import com.fongmi.android.tv.App;
-import com.fongmi.android.tv.Constant;
 import com.fongmi.android.tv.R;
 import com.fongmi.android.tv.Setting;
 import com.fongmi.android.tv.api.config.VodConfig;
@@ -44,18 +43,12 @@ public class CollectActivity extends BaseActivity {
     private ArrayObjectAdapter mAdapter;
     private SiteViewModel mViewModel;
     private PauseExecutor mExecutor;
-    private List<Site> mSites;
     private View mOldView;
 
     public static void start(Activity activity, String keyword) {
-        start(activity, keyword, false);
-    }
-
-    public static void start(Activity activity, String keyword, boolean clear) {
-        Intent intent = new Intent(activity, CollectActivity.class);
-        if (clear) intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        Intent intent = new Intent(activity, CollectActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         intent.putExtra("keyword", keyword);
-        activity.startActivityForResult(intent, 1000);
+        activity.startActivity(intent);
     }
 
     private CollectFragment getFragment() {
@@ -72,12 +65,20 @@ public class CollectActivity extends BaseActivity {
     }
 
     @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        getIntent().putExtras(intent);
+        mAdapter.clear();
+        setPager();
+        search();
+    }
+
+    @Override
     protected void initView() {
         setRecyclerView();
         setViewModel();
         saveKeyword();
         setPager();
-        setSite();
         search();
     }
 
@@ -116,21 +117,19 @@ public class CollectActivity extends BaseActivity {
         mBinding.pager.setAdapter(new PageAdapter(getSupportFragmentManager()));
     }
 
-    private void setSite() {
-        mSites = new ArrayList<>();
-        for (Site site : VodConfig.get().getSites()) if (site.isSearchable()) mSites.add(site);
-        Site home = VodConfig.get().getHome();
-        if (!mSites.contains(home)) return;
-        mSites.remove(home);
-        mSites.add(0, home);
+    private List<Site> getSites() {
+        List<Site> items = new ArrayList<>();
+        for (Site site : VodConfig.get().getSites()) if (site.isSearchable()) items.add(site);
+        return items;
     }
 
     private void search() {
         mAdapter.add(Collect.all());
+        if (mExecutor != null) stop();
         mBinding.pager.getAdapter().notifyDataSetChanged();
-        mExecutor = new PauseExecutor(Constant.THREAD_POOL);
+        mExecutor = new PauseExecutor(10);
         mBinding.result.setText(getString(R.string.collect_result, getKeyword()));
-        for (Site site : mSites) mExecutor.execute(() -> search(site));
+        for (Site site : getSites()) mExecutor.execute(() -> search(site));
     }
 
     private void search(Site site) {
@@ -159,7 +158,7 @@ public class CollectActivity extends BaseActivity {
         if (child == null) return;
         mOldView = child.itemView;
         mOldView.setActivated(true);
-        App.post(mRunnable, 200);
+        App.post(mRunnable, 100);
     }
 
     private final Runnable mRunnable = new Runnable() {
@@ -168,14 +167,6 @@ public class CollectActivity extends BaseActivity {
             mBinding.pager.setCurrentItem(mBinding.recycler.getSelectedPosition());
         }
     };
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (resultCode != RESULT_OK) return;
-        setResult(RESULT_OK);
-        finish();
-    }
 
     @Override
     protected void onResume() {
@@ -190,8 +181,8 @@ public class CollectActivity extends BaseActivity {
     }
 
     @Override
-    public void onBackPressed() {
-        super.onBackPressed();
+    protected void onBackInvoked() {
+        super.onBackInvoked();
         stop();
     }
 

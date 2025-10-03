@@ -42,7 +42,6 @@ import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 
 import java.io.IOException;
-import java.util.List;
 
 import kotlin.Unit;
 import okhttp3.Call;
@@ -54,6 +53,7 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
 
     private final FormBody.Builder body;
     private final OkHttpClient client;
+    private final ScanTask scanTask;
 
     private DialogDeviceBinding binding;
     private DeviceAdapter adapter;
@@ -67,6 +67,7 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
     }
 
     public CastDialog() {
+        scanTask = new ScanTask(this);
         body = new FormBody.Builder();
         body.add("device", Device.get().toString());
         body.add("config", Config.vod().toString());
@@ -120,13 +121,14 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
     }
 
     private void setRecyclerView() {
-        binding.recycler.setHasFixedSize(true);
+        binding.recycler.setHasFixedSize(false);
         binding.recycler.setAdapter(adapter = new DeviceAdapter(this));
     }
 
     private void getDevice() {
-        if (fm) adapter.addAll(Device.getAll());
-        adapter.addAll(DLNADevice.get().getAll());
+        adapter.setItems(Device.getAll(), () -> {
+            if (adapter.getItemCount() == 0) onRefresh();
+        });
     }
 
     private void initDLNA() {
@@ -135,13 +137,14 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
     }
 
     private void onScan() {
-        ScanActivity.start(getActivity());
+        ScanActivity.start(requireActivity());
     }
 
     private void onRefresh() {
-        if (fm) ScanTask.create(this).start(adapter.getIps());
-        DLNACastManager.INSTANCE.search(null);
         adapter.clear();
+        DLNADevice.get().disconnect();
+        DLNACastManager.INSTANCE.search(null);
+        if (fm) scanTask.start(adapter.getIps());
     }
 
     private void onCasted() {
@@ -151,17 +154,17 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
 
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onScanEvent(ScanEvent event) {
-        ScanTask.create(this).start(event.getAddress());
+        scanTask.start(event.getAddress());
     }
 
     @Override
-    public void onFind(List<Device> devices) {
-        if (!devices.isEmpty()) adapter.addAll(devices);
+    public void onFind(Device device) {
+        adapter.addItem(device);
     }
 
     @Override
     public void onDeviceAdded(@NonNull org.fourthline.cling.model.meta.Device<?, ?, ?> device) {
-        adapter.addAll(DLNADevice.get().add(device));
+        adapter.addItem(DLNADevice.get().add(device));
     }
 
     @Override
@@ -215,6 +218,12 @@ public class CastDialog extends BaseDialog implements DeviceAdapter.OnClickListe
         EventBus.getDefault().unregister(this);
         DLNACastManager.INSTANCE.unregisterListener(this);
         DLNACastManager.INSTANCE.unbindCastService(App.get());
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        scanTask.stop();
     }
 
     @Override
